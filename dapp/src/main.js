@@ -6,7 +6,7 @@ import './registerServiceWorker'
 
 /** Bootstrap 4 */
 import BootstrapVue from 'bootstrap-vue'
-import './assets/bootstrap.scss'
+import './assets/css/bootstrap.scss'
 Vue.use(BootstrapVue)
 
 Vue.config.productionTip = false

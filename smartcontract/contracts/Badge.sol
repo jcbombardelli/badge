@@ -1,4 +1,5 @@
 pragma solidity ^0.5.9;
+pragma experimental ABIEncoderV2;
 
 contract TheBadge {
 
@@ -18,7 +19,7 @@ contract TheBadge {
         uint id;
         string name;
         string description;
-        string awardee;
+        address awardee;
         string assertion;
         string criteria;
         string image;
@@ -29,34 +30,39 @@ contract TheBadge {
     Issuer[] private issuers;
     Badge[] private badges;
 
-    mapping(address => Badge[]) badgesByAddressAwardee;
-    mapping(address => bool) issuersAuthorized;
-    mapping(uint => uint) indexedPositionIssuersById;
-
+    mapping(address => uint) indexedPositionIssuersByAddress;
+    mapping(address => uint[]) indexedPositionBadgesByAddress;
 
     /*Events*/
     event NewBadgeIssued(address to, uint id, string name);
+    event NewIssuerCreated(address issuer);
 
 
     constructor () public{
         owner = msg.sender;
-    }
+        indexedPositionIssuersByAddress[address(0x0)] = 0;
+        issuers.push(Issuer({ name: "", url: "", organization: "",
+            addr: address(0x0)}));
 
+        indexedPositionIssuersByAddress[address(0x0)] = 0;
+        badges.push(Badge({ id: 0, name: "", description: "",
+            awardee: address(0x0), assertion: "",
+            criteria: "", image: "", registeredAt: 0 }));
+
+    }
 
     modifier onlyOwner() {
         require(owner == msg.sender, 'only owner can execute this operation');
         _;
     }
 
-    modifier exceptOwner() {
-        require(owner != msg.sender, 'owner not execute this operation');
+    modifier onlyIssuer() {
+        require(isIssuer(msg.sender), 'only issuer can execute this operation');
         _;
     }
 
-    //modifier isNotOwner
-
-
-    function newIssuer(string memory _name, string memory _url, string memory _organization, address _address) onlyOwner() public {
+    function newIssuer(
+        string memory _name, string memory _url, string memory _organization, address _address) public onlyOwner {
 
         Issuer memory nIssuer = Issuer({
             name: _name,
@@ -66,16 +72,32 @@ contract TheBadge {
         });
 
         issuers.push(nIssuer);
-    }
-
-    function revokeIssuer(address _addr) public onlyOwner() {
-
+        emit NewIssuerCreated(nIssuer.addr);
 
     }
+
+    function revokeIssuer(address _addr) public onlyOwner {
+
+        uint indexIssuer = indexedPositionIssuersByAddress[_addr];
+        require(indexIssuer > 0, "Issuer no exists");
+
+        uint lastIndexIssuer = issuers.length - 1;
+        issuers[indexIssuer] = issuers[lastIndexIssuer];
+
+        delete indexedPositionIssuersByAddress[_addr];
+        indexedPositionIssuersByAddress[issuers[lastIndexIssuer].addr] = indexIssuer;
+
+    }
+
+    function isIssuer(address _addr) public view returns(bool){
+        return indexedPositionIssuersByAddress[_addr] > 0;
+    }
+
 
     function newBadge(address _to, string memory _name, string memory _description,
-        string memory _awardee, string memory _assertion, string memory _criteria, string memory _image) public exceptOwner() {
+        address _awardee, string memory _assertion, string memory _criteria, string memory _image) public onlyIssuer {
 
+        require(indexedPositionIssuersByAddress[_to] == 0, "Issuer cant receiver the badge");
 
         uint _now = now;
         uint _id = generateBadgeId(_name, _description, _awardee, _assertion, _criteria, _now);
@@ -92,19 +114,43 @@ contract TheBadge {
         });
 
         badges.push(badge);
-        badgesByAddressAwardee[_to];
-
 
         emit NewBadgeIssued(_to, badge.id, badge.name);
 
     }
 
-    function revokeBadge(){
-        
+     function countBadgesByAddress(address _addr) public view returns(uint){
+        uint[] memory indexes = indexedPositionBadgesByAddress[_addr];
+        return indexes.length;
     }
 
+    function listBadgesByAddress(address _addr) public view
+        returns(uint[] memory, string[] memory, string[] memory, string[] memory, string[] memory, string[] memory){
+
+        uint[] memory indexes = indexedPositionBadgesByAddress[_addr];
+
+        uint[] memory ids = new uint[](indexes.length);
+        string[] memory names = new string[](indexes.length);
+        string[] memory descriptions = new string[](indexes.length);
+        string[] memory assertions = new string[](indexes.length);
+        string[] memory criterias = new string[](indexes.length);
+        string[] memory images = new string[](indexes.length);
+
+        for(uint index = 0; index < indexes.length; index++) {
+            ids[index] = badges[indexes[index]].id;
+            names[index] = badges[indexes[index]].name;
+            descriptions[index] = badges[indexes[index]].description;
+            assertions[index] = badges[indexes[index]].assertion;
+            criterias[index] = badges[indexes[index]].criteria;
+            images[index] = badges[indexes[index]].image;
+        }
+
+        return (ids, names, descriptions, assertions, criterias, images);
+    }
+
+
     /*Utils*/
-    function generateBadgeId(string memory _name, string memory _description, string memory _awardee,
+    function generateBadgeId(string memory _name, string memory _description, address _awardee,
         string memory _assertion, string memory _criteria, uint _timeRegister) public pure returns(uint) {
 
         return uint(keccak256(abi.encodePacked(_name, _description, _awardee, _assertion, _criteria, _timeRegister)));
