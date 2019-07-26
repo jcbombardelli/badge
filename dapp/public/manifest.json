@@ -1,6 +1,6 @@
 {
-  "name": "badge",
-  "short_name": "badge",
+  "name": "dapp",
+  "short_name": "dapp",
   "icons": [
     {
       "src": "./img/icons/android-chrome-192x192.png",
